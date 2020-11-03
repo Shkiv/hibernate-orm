@@ -19,6 +19,7 @@ import java.util.Set;
 import org.hibernate.EntityMode;
 import org.hibernate.HibernateException;
 import org.hibernate.MappingException;
+import org.hibernate.boot.spi.SessionFactoryOptions;
 import org.hibernate.bytecode.enhance.spi.interceptor.EnhancementHelper;
 import org.hibernate.bytecode.spi.BytecodeEnhancementMetadata;
 import org.hibernate.cfg.NotYetImplementedException;
@@ -29,6 +30,7 @@ import org.hibernate.engine.spi.SessionFactoryImplementor;
 import org.hibernate.internal.CoreMessageLogger;
 import org.hibernate.internal.util.ReflectHelper;
 import org.hibernate.internal.util.collections.ArrayHelper;
+import org.hibernate.internal.util.collections.CollectionHelper;
 import org.hibernate.mapping.Component;
 import org.hibernate.mapping.PersistentClass;
 import org.hibernate.mapping.Property;
@@ -117,8 +119,8 @@ public class EntityMetamodel implements Serializable {
 	private final boolean explicitPolymorphism;
 	private final boolean inherited;
 	private final boolean hasSubclasses;
-	private final Set subclassEntityNames = new HashSet();
-	private final Map entityNameByInheritenceClassMap = new HashMap();
+	private final Set subclassEntityNames;
+	private final Map<Class,String> entityNameByInheritenceClassMap;
 
 	private final EntityMode entityMode;
 	private final EntityTuplizer entityTuplizer;
@@ -139,6 +141,8 @@ public class EntityMetamodel implements Serializable {
 		);
 
 		versioned = persistentClass.isVersioned();
+
+		SessionFactoryOptions sessionFactoryOptions = sessionFactory.getSessionFactoryOptions();
 
 		if ( persistentClass.hasPojoRepresentation() ) {
 			final Component identifierMapperComponent = persistentClass.getIdentifierMapper();
@@ -163,7 +167,8 @@ public class EntityMetamodel implements Serializable {
 					persistentClass,
 					idAttributeNames,
 					nonAggregatedCidMapper,
-					sessionFactory.getSessionFactoryOptions().isEnhancementAsProxyEnabled()
+					sessionFactoryOptions.isEnhancementAsProxyEnabled(),
+					sessionFactoryOptions.isCollectionsInDefaultFetchGroupEnabled()
 			);
 		}
 		else {
@@ -245,7 +250,8 @@ public class EntityMetamodel implements Serializable {
 			boolean lazy = ! EnhancementHelper.includeInBaseFetchGroup(
 					prop,
 					bytecodeEnhancementMetadata.isEnhancedForLazyLoading(),
-					sessionFactory.getSessionFactoryOptions().isEnhancementAsProxyEnabled()
+					sessionFactoryOptions.isEnhancementAsProxyEnabled(),
+					sessionFactoryOptions.isCollectionsInDefaultFetchGroupEnabled()
 			);
 
 			if ( lazy ) {
@@ -392,22 +398,26 @@ public class EntityMetamodel implements Serializable {
 		hasMutableProperties = foundMutable;
 
 		iter = persistentClass.getSubclassIterator();
+		final Set<String> subclassEntityNamesLocal = new HashSet<>();
 		while ( iter.hasNext() ) {
-			subclassEntityNames.add( ( (PersistentClass) iter.next() ).getEntityName() );
+			subclassEntityNamesLocal.add( ( (PersistentClass) iter.next() ).getEntityName() );
 		}
-		subclassEntityNames.add( name );
+		subclassEntityNamesLocal.add( name );
+		subclassEntityNames = CollectionHelper.toSmallSet( subclassEntityNamesLocal );
 
+		HashMap<Class, String> entityNameByInheritenceClassMapLocal = new HashMap<Class, String>();
 		if ( persistentClass.hasPojoRepresentation() ) {
-			entityNameByInheritenceClassMap.put( persistentClass.getMappedClass(), persistentClass.getEntityName() );
+			entityNameByInheritenceClassMapLocal.put( persistentClass.getMappedClass(), persistentClass.getEntityName() );
 			iter = persistentClass.getSubclassIterator();
 			while ( iter.hasNext() ) {
 				final PersistentClass pc = ( PersistentClass ) iter.next();
-				entityNameByInheritenceClassMap.put( pc.getMappedClass(), pc.getEntityName() );
+				entityNameByInheritenceClassMapLocal.put( pc.getMappedClass(), pc.getEntityName() );
 			}
 		}
+		entityNameByInheritenceClassMap = CollectionHelper.toSmallMap( entityNameByInheritenceClassMapLocal );
 
 		entityMode = persistentClass.hasPojoRepresentation() ? EntityMode.POJO : EntityMode.MAP;
-		final EntityTuplizerFactory entityTuplizerFactory = sessionFactory.getSessionFactoryOptions().getEntityTuplizerFactory();
+		final EntityTuplizerFactory entityTuplizerFactory = sessionFactoryOptions.getEntityTuplizerFactory();
 		final String tuplizerClassName = persistentClass.getTuplizerImplClassName( entityMode );
 		if ( tuplizerClassName == null ) {
 			entityTuplizer = entityTuplizerFactory.constructDefaultTuplizer( entityMode, this, persistentClass );
@@ -958,7 +968,7 @@ public class EntityMetamodel implements Serializable {
 	 * @return The mapped entity-name, or null if no such mapping was found.
 	 */
 	public String findEntityNameByEntityClass(Class inheritenceClass) {
-		return ( String ) entityNameByInheritenceClassMap.get( inheritenceClass );
+		return entityNameByInheritenceClassMap.get( inheritenceClass );
 	}
 
 	@Override

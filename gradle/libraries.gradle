@@ -10,12 +10,12 @@
 ext {
 
     junitVersion = '4.12'
-    h2Version = '1.4.196'
-    bytemanVersion = '4.0.8' //Compatible with JDK14
+    h2Version = '1.4.197'
+    bytemanVersion = '4.0.13' //Compatible with JDK16
     jnpVersion = '5.0.6.CR1'
 
-    hibernateCommonsVersion = '5.1.0.Final'
-    hibernateValidatorVersion = '6.0.13.Final'
+    hibernateCommonsVersion = '5.1.2.Final'
+    hibernateValidatorVersion = '6.1.6.Final'
     validationApiVersion = '2.0.1.Final'
     elVersion = '3.0.1-b09'
 
@@ -23,20 +23,16 @@ ext {
     weldVersion = '3.0.0.Final'
 
     javassistVersion = '3.24.0-GA'
-    byteBuddyVersion = '1.10.7'
+    byteBuddyVersion = '1.10.17'
 
-    agroalVersion = '1.7'
+    agroalVersion = '1.9'
 
     assertjVersion = '3.14.0'
 
     geolatteVersion = '1.4.0'
 
-    // Wildfly version targeted by module ZIP; Arquillian/Shrinkwrap versions used for CDI testing and testing the module ZIP
-    wildflyVersion = '17.0.1.Final'
-    arquillianVersion = '1.4.1.Final'
     shrinkwrapVersion = '1.2.6'
     shrinkwrapDescriptorsVersion = '2.0.0'
-    wildflyArquillianContainerVersion = '2.2.0.Final'
 
     jodaTimeVersion = '2.3'
 
@@ -57,11 +53,11 @@ ext {
 
             // Annotations
             commons_annotations: "org.hibernate.common:hibernate-commons-annotations:${hibernateCommonsVersion}",
-            jandex:         'org.jboss:jandex:2.1.1.Final',
+            jandex:         'org.jboss:jandex:2.1.3.Final',
             classmate:      'com.fasterxml:classmate:1.5.1',
 
             // Dom4J
-            dom4j:          'org.dom4j:dom4j:2.1.1@jar',
+            dom4j:          'org.dom4j:dom4j:2.1.3@jar',
 
             // Javassist
             javassist:      "org.javassist:javassist:${javassistVersion}",
@@ -79,7 +75,7 @@ ext {
             activation:     'javax.activation:javax.activation-api:1.2.0',
 
             // logging
-            logging:        'org.jboss.logging:jboss-logging:3.3.2.Final',
+            logging:        'org.jboss.logging:jboss-logging:3.4.1.Final',
             logging_annotations: 'org.jboss.logging:jboss-logging-annotations:2.1.0.Final',
             logging_processor:  'org.jboss.logging:jboss-logging-processor:2.1.0.Final',
 
@@ -115,11 +111,12 @@ ext {
             h2:              "com.h2database:h2:${h2Version}",
             hsqldb:          "org.hsqldb:hsqldb:2.3.2",
             derby:           "org.apache.derby:derby:10.11.1.1",
-            postgresql:      'org.postgresql:postgresql:42.2.2',
+            postgresql:      'org.postgresql:postgresql:42.2.16',
             mysql:           'mysql:mysql-connector-java:8.0.17',
             mariadb:         'org.mariadb.jdbc:mariadb-java-client:2.2.3',
+            cockroachdb:     'org.postgresql:postgresql:42.2.8',
 
-            oracle:          'com.oracle.jdbc:ojdbc8:12.2.0.1',
+            oracle:          'com.oracle.database.jdbc:ojdbc8:19.8.0.0',
             mssql:           'com.microsoft.sqlserver:mssql-jdbc:7.2.1.jre8',
             db2:             'com.ibm.db2:db2jcc:10.5',
             hana:            'com.sap.cloud.db.jdbc:ngdbc:2.4.59',
@@ -136,7 +133,7 @@ ext {
             // EL required by Hibernate Validator at test runtime
             expression_language: "org.glassfish:javax.el:${elVersion}",
 
-            c3p0:            "com.mchange:c3p0:0.9.5.3",
+            c3p0:            "com.mchange:c3p0:0.9.5.5",
             ehcache:         "net.sf.ehcache:ehcache:2.10.6",
             ehcache3:        "org.ehcache:ehcache:3.6.1",
             jcache:          "javax.cache:cache-api:1.0.0",
@@ -154,19 +151,14 @@ ext {
 
             assertj: "org.assertj:assertj-core:${assertjVersion}",
 
-            // Arquillian/Shrinkwrap
-            arquillian_junit_container: "org.jboss.arquillian.junit:arquillian-junit-container:${arquillianVersion}",
-            arquillian_protocol_servlet: "org.jboss.arquillian.protocol:arquillian-protocol-servlet:${arquillianVersion}",
-
+            // Shrinkwrap
             shrinkwrap_api: "org.jboss.shrinkwrap:shrinkwrap-api:${shrinkwrapVersion}",
             shrinkwrap: "org.jboss.shrinkwrap:shrinkwrap-impl-base:${shrinkwrapVersion}",
 
             shrinkwrap_descriptors_api_javaee: "org.jboss.shrinkwrap.descriptors:shrinkwrap-descriptors-api-javaee:${shrinkwrapDescriptorsVersion}",
             shrinkwrap_descriptors_impl_javaee: "org.jboss.shrinkwrap.descriptors:shrinkwrap-descriptors-impl-javaee:${shrinkwrapDescriptorsVersion}",
 
-            wildfly_arquillian_container_managed: "org.wildfly.arquillian:wildfly-arquillian-container-managed:${wildflyArquillianContainerVersion}",
             jboss_vfs: "org.jboss:jboss-vfs:3.2.11.Final",
-            jipijapa_spi: "org.wildfly:jipijapa-spi:${wildflyVersion}",
             wildfly_transaction_client : 'org.wildfly.transaction:wildfly-transaction-client:1.1.7.Final',
 
             jboss_ejb_spec_jar          : 'org.jboss.spec.javax.ejb:jboss-ejb-api_3.2_spec:1.0.0.Final',

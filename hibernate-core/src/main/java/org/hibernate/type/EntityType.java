@@ -471,6 +471,18 @@ public abstract class EntityType extends AbstractType implements AssociationType
 		return null;
 	}
 
+	/**
+	 * Would an entity be eagerly loaded given the value provided for {@code overridingEager}?
+	 *
+	 * @param overridingEager can override eager from the mapping.
+	 *
+	 * @return If {@code overridingEager} is null, then it does not override.
+	 *         If true or false then it overrides the mapping value.
+	 */
+	public boolean isEager(Boolean overridingEager) {
+		return overridingEager != null ? overridingEager : this.eager;
+	}
+
 	@Override
 	public Type getSemiResolvedType(SessionFactoryImplementor factory) {
 		return getAssociatedEntityPersister( factory ).getIdentifierType();
@@ -506,7 +518,7 @@ public abstract class EntityType extends AbstractType implements AssociationType
 			Object propertyValue = entityPersister.getPropertyValue( value, uniqueKeyPropertyName );
 			// We now have the value of the property-ref we reference.  However,
 			// we need to dig a little deeper, as that property might also be
-			// an entity type, in which case we need to resolve its identitifier
+			// an entity type, in which case we need to resolve its identifier
 			Type type = entityPersister.getPropertyType( uniqueKeyPropertyName );
 			if ( type.isEntityType() ) {
 				propertyValue = ( (EntityType) type ).getIdentifier( propertyValue, session );
@@ -682,12 +694,10 @@ public abstract class EntityType extends AbstractType implements AssociationType
 				getAssociatedEntityPersister( session.getFactory() )
 						.isInstrumented();
 
-		boolean eager = overridingEager != null ? overridingEager : this.eager;
-
 		Object proxyOrEntity = session.internalLoad(
 				getAssociatedEntityName(),
 				id,
-				eager,
+				isEager( overridingEager ),
 				isNullable()
 		);
 

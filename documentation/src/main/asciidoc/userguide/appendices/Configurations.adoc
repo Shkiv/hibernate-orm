@@ -621,6 +621,9 @@ Write all SQL statements to the console. This is an alternative to setting the l
 `*hibernate.format_sql*` (e.g. `true` or `false` (default value))::
 Pretty-print the SQL in the log and console.
 
+`*hibernate.highlight_sql*` (e.g. `true` or `false` (default value))::
+Colorize the SQL in the console using ANSI escape codes.
+
 `*hibernate.use_sql_comments*` (e.g. `true` or `false` (default value))::
 If true, Hibernate generates comments inside the SQL, for easier debugging.
 
@@ -657,7 +660,7 @@ Enables the query cache. You still need to set individual queries to be cachable
 Enable/disable the second-level cache, which is enabled by default, although the default `RegionFactor` is `NoCachingRegionFactory` (meaning there is no actual caching implementation).
 
 `*hibernate.cache.query_cache_factory*` (e.g. fully-qualified class name)::
-A custom https://docs.jboss.org/hibernate/orm/{majorMinorVersion}/javadocs/org/hibernate/cache/spi/QueryCacheFactory.html[`QueryCacheFactory`] interface. The default is the built-in `StandardQueryCacheFactory`.
+A custom https://docs.jboss.org/hibernate/orm/{majorMinorVersion}/javadocs/org/hibernate/cache/spi/TimestampsCacheFactory.html[`TimestampsCacheFactory`] interface. The default is the built-in `StandardTimestampsCacheFactory`.
 
 `*hibernate.cache.region_prefix*` (e.g. A string)::
 A prefix for second-level cache region names.
@@ -681,7 +684,7 @@ Sets the associated collection cache concurrency strategy for the designated reg
 === Infinispan properties
 
 For more details about how to customize the Infinispan second-level cache provider, check out the
-http://infinispan.org/docs/stable/user_guide/user_guide.html#configuration_properties[Infinispan User Guide].
+https://infinispan.org/docs/stable/titles/integrating/integrating.html#configuration_properties[Infinispan User Guide].
 
 [[configurations-transactions]]
 === Transactions properties
@@ -832,7 +835,7 @@ See https://docs.jboss.org/hibernate/orm/{majorMinorVersion}/javadocs/org/hibern
 +
 If no value is specified, a default is assumed as follows:
 +
-* if source scripts are specified (per `javax.persistence.schema-generation.create-script-source`), then the `script` option is assumed
+* if source scripts are specified (per `javax.persistence.schema-generation.drop-script-source`), then the `script` option is assumed
 * otherwise, `metadata` is assumed
 
 `*javax.persistence.schema-generation.create-script-source*`::
@@ -900,6 +903,9 @@ If enabled, allows schema update and validation to support synonyms. Due to the 
 
 `*hibernate.hbm2ddl.extra_physical_table_types*` (e.g. `BASE TABLE`)::
 Identifies a comma-separated list of values to specify extra table types, other than the default `TABLE` value, to recognize as defining a physical table by schema update, creation and validation.
+
+`*hibernate.hbm2ddl.default_constraint_mode*` (`CONSTRAINT` (default value) or `NO_CONSTRAINT`)::
+Default `javax.persistence.ConstraintMode` for foreign key mapping if `PROVIDER_DEFAULT` strategy used.
 
 `*hibernate.schema_update.unique_constraint_strategy*` (e.g. `DROP_RECREATE_QUIETLY`, `RECREATE_QUIETLY`, `SKIP`)::
 Unique columns and unique keys both use unique constraints in most dialects.

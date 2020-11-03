@@ -10,7 +10,7 @@ buildscript {
 		mavenCentral()
 	}
 	dependencies {
-		classpath 'de.thetaphi:forbiddenapis:2.6'
+		classpath 'de.thetaphi:forbiddenapis:3.0.1'
 	}
 }
 
@@ -37,10 +37,6 @@ ext {
 	java9ModuleName = "org.hibernate.orm.$project.java9ModuleNameBase"
 	forbiddenAPITargetJDKCompatibility = '11'
 }
-
-
-sourceCompatibility = project.baselineJavaVersion
-targetCompatibility = project.baselineJavaVersion
 
 if ( !project.description ) {
 	project.description = "The Hibernate ORM $project.name module"
@@ -89,13 +85,12 @@ dependencies {
 	testRuntime( libraries.mssql )
 	testRuntime( libraries.informix )
 	testRuntime( libraries.hana )
+	testRuntime( libraries.cockroachdb )
 
 	asciidoclet 'org.asciidoctor:asciidoclet:1.+'
 
-	if ( db.equalsIgnoreCase( 'oracle' ) ) {
-		testRuntime( libraries.oracle ) {
-			exclude group: 'com.oracle.jdbc', module: 'xmlparserv2'
-		}
+	if ( db.equalsIgnoreCase( 'oracle' ) || db.equalsIgnoreCase( 'oracle_docker' ) ) {
+		testRuntime( libraries.oracle )
 	}
 	else if ( db.equalsIgnoreCase( 'db2' ) ) {
 		testRuntime( libraries.db2 )
@@ -115,8 +110,20 @@ dependencies {
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Compilation
 
-tasks.withType(JavaCompile) {
+tasks.withType( JavaCompile ) {
 	options.encoding = 'UTF-8'
+	sourceCompatibility = project.baselineJavaVersion
+	targetCompatibility = project.baselineJavaVersion
+}
+
+if ( project.baselineJavaVersion != gradle.ext.testedJavaVersion ) {
+	logger.info( "Forcing the target bytecode version for test classes to '$gradle.ext.testedJavaVersion'" )
+
+	tasks.compileTestJava {
+		// For *tests only*, generate bytecode matching the Java version currently in use.
+		// This allows testing bytecode enhancement on the latest Java versions (13, 14, ...).
+		targetCompatibility = gradle.ext.testedJavaVersion
+	}
 }
 
 task compile(dependsOn: [compileJava, processResources, compileTestJava, processTestResources] )
@@ -167,10 +174,10 @@ tasks.withType( Test.class ).all { task ->
 	task.jvmArgs += [
 			'-XX:+HeapDumpOnOutOfMemoryError',
 			"-XX:HeapDumpPath=${file( "${buildDir}/OOM-dump.hprof" ).absolutePath}",
-			'-XX:MetaspaceSize=512M'
+			'-XX:MetaspaceSize=256M'
 	]
 
-	task.maxHeapSize = '4G'
+	task.maxHeapSize = '3G'
 
 	task.systemProperties['hibernate.test.validatefailureexpected'] = true
 	task.systemProperties += System.properties.findAll { it.key.startsWith( "hibernate." ) }
@@ -189,7 +196,6 @@ processTestResources {
 		copy {
 			from file( 'src/test/resources' )
 			into file( "${buildDir}/resources/test" )
-			exclude 'src/test/resources/arquillian.xml'
 			exclude 'src/test/resources/hibernate.properties'
 		}
 		copy {
@@ -200,15 +206,20 @@ processTestResources {
 	}
 }
 
-// Enable the experimental features of ByteBuddy with JDK 12+
+// Keep system properties in sync with gradle.properties!
 test {
-	//Only safe to attempt to parse the version as an integer since JDK11
-	if ( JavaVersion.current().isJava11Compatible() ) {
-		int majorJVMVersionInt = Integer.valueOf(JavaVersion.current().toString());
-		//Set the -Dnet.bytebuddy.experimental=true property only when we need it:
-		if (majorJVMVersionInt >= 12) {
-			systemProperty 'net.bytebuddy.experimental', true
-		}
+	systemProperty 'user.language', 'en'
+	systemProperty 'user.country', 'US'
+	systemProperty 'user.timezone', 'UTC'
+	systemProperty 'file.encoding', 'UTF-8'
+}
+
+// Enable the experimental features of ByteBuddy with JDK 15+
+test {
+	if ( Integer.valueOf( gradle.ext.testedJavaVersionAsEnum.getMajorVersion() ) >= 15 ) {
+		logger.warn( "The version of java that will be tested is not supported by Bytebuddy by default. " +
+				 " Setting 'net.bytebuddy.experimental=true'." )
+		systemProperty 'net.bytebuddy.experimental', true
 	}
 }
 
@@ -290,15 +301,11 @@ task copyResourcesToIntelliJOutFolder {
 
  Afterward, you can run any test from the IDE against that particular DB.
  */
-task setDataBase {
-	inputs.property( "db", db )
-	doLast {
-		processTestResources.execute()
-		copyResourcesToIntelliJOutFolder.execute()
-
-		println( 'Setting current database to ' + db )
-	}
+task setDataBase dependsOn( processTestResources, copyResourcesToIntelliJOutFolder ) {
+	println( 'Setting current database to ' + db )
 }
+
+copyResourcesToIntelliJOutFolder.mustRunAfter processTestResources
 
 // ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 // Report configs
@@ -330,6 +337,10 @@ task forbiddenApisSystemOut(type: CheckForbiddenApis, dependsOn: compileJava) {
 	targetCompatibility = project.forbiddenAPITargetJDKCompatibility
 	bundledSignatures += 'jdk-system-out'
 	suppressAnnotations += ['org.hibernate.internal.build.AllowSysOut', 'org.hibernate.internal.build.AllowPrintStacktrace']
+
+	// This slows down the checks a little, but is necessary to avoid the gradle deamon holding on
+	// to class definitions loaded previously - even possibly in a previous build.
+	disableClassloadingCache = true
 }
 
 task forbiddenApisUnsafe(type: CheckForbiddenApis, dependsOn: compileJava) {
@@ -343,6 +354,10 @@ task forbiddenApisUnsafe(type: CheckForbiddenApis, dependsOn: compileJava) {
 	//
 	// No idea how findbugs was missing these b4
 	ignoreFailures = true
+
+	// This slows down the checks a little, but is necessary to avoid the gradle deamon holding on
+	// to class definitions loaded previously - even possibly in a previous build.
+	disableClassloadingCache = true
 }
 
 task forbiddenApisNonPortable(type: CheckForbiddenApis, dependsOn: compileJava) {
@@ -350,6 +365,10 @@ task forbiddenApisNonPortable(type: CheckForbiddenApis, dependsOn: compileJava) 
 	classpath = project.sourceSets.main.compileClasspath + project.sourceSets.main.runtimeClasspath
 	targetCompatibility = project.forbiddenAPITargetJDKCompatibility
 	bundledSignatures += 'jdk-non-portable'
+
+	// This slows down the checks a little, but is necessary to avoid the gradle deamon holding on
+	// to class definitions loaded previously - even possibly in a previous build.
+	disableClassloadingCache = true
 }
 
 task forbiddenApis

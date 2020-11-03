@@ -334,9 +334,9 @@ public class JoinSequence {
 						join.getAlias(),
 						enabledFilters
 				);
-				condition = "".equals( manyToManyFilter )
+				condition = (manyToManyFilter != null && manyToManyFilter.isEmpty())
 						? on
-						: "".equals( on ) ? manyToManyFilter : on + " and " + manyToManyFilter;
+						: (on != null && on.isEmpty()) ? manyToManyFilter : on + " and " + manyToManyFilter;
 			}
 			else {
 				condition = on;
@@ -484,7 +484,7 @@ public class JoinSequence {
 	 * @return {@link this}, for method chaining
 	 */
 	public JoinSequence addCondition(String condition) {
-		if ( condition.trim().length() != 0 ) {
+		if ( !StringHelper.isBlank( condition ) ) {
 			if ( !condition.startsWith( " and " ) ) {
 				conditions.append( " and " );
 			}

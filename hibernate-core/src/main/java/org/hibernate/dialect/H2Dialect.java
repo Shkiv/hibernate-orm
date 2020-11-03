@@ -37,6 +37,7 @@ import org.hibernate.internal.CoreMessageLogger;
 import org.hibernate.internal.util.JdbcExceptionHelper;
 import org.hibernate.internal.util.ReflectHelper;
 import org.hibernate.tool.schema.extract.internal.SequenceInformationExtractorH2DatabaseImpl;
+import org.hibernate.tool.schema.extract.internal.SequenceInformationExtractorLegacyImpl;
 import org.hibernate.tool.schema.extract.internal.SequenceInformationExtractorNoOpImpl;
 import org.hibernate.tool.schema.extract.spi.SequenceInformationExtractor;
 import org.hibernate.type.StandardBasicTypes;
@@ -72,6 +73,7 @@ public class H2Dialect extends Dialect {
 		}
 	};
 
+	private final boolean supportsTuplesInSubqueries;
 	private final String querySequenceString;
 	private final SequenceInformationExtractor sequenceInformationExtractor;
 
@@ -82,6 +84,7 @@ public class H2Dialect extends Dialect {
 		super();
 
 		int buildId = Integer.MIN_VALUE;
+		boolean supportsTuplesInSubqueries = false;
 
 		try {
 			// HHH-2300
@@ -93,6 +96,7 @@ public class H2Dialect extends Dialect {
 			if ( ! ( majorVersion > 1 || minorVersion > 2 || buildId >= 139 ) ) {
 				LOG.unsupportedMultiTableBulkHqlJpaql( majorVersion, minorVersion, buildId );
 			}
+			supportsTuplesInSubqueries = majorVersion > 1 || minorVersion > 4 || buildId >= 198;
 		}
 		catch ( Exception e ) {
 			// probably H2 not in the classpath, though in certain app server environments it might just mean we are
@@ -101,13 +105,16 @@ public class H2Dialect extends Dialect {
 		}
 
 		if ( buildId >= 32 ) {
-			this.sequenceInformationExtractor = SequenceInformationExtractorH2DatabaseImpl.INSTANCE;
+			this.sequenceInformationExtractor = buildId >= 201
+					? SequenceInformationExtractorLegacyImpl.INSTANCE
+					: SequenceInformationExtractorH2DatabaseImpl.INSTANCE;
 			this.querySequenceString = "select * from INFORMATION_SCHEMA.SEQUENCES";
 		}
 		else {
 			this.sequenceInformationExtractor = SequenceInformationExtractorNoOpImpl.INSTANCE;
 			this.querySequenceString = null;
 		}
+		this.supportsTuplesInSubqueries = supportsTuplesInSubqueries;
 
 		registerColumnType( Types.BOOLEAN, "boolean" );
 		registerColumnType( Types.BIGINT, "bigint" );
@@ -115,8 +122,8 @@ public class H2Dialect extends Dialect {
 		registerColumnType( Types.BIT, "boolean" );
 		registerColumnType( Types.CHAR, "char($l)" );
 		registerColumnType( Types.DATE, "date" );
-		registerColumnType( Types.DECIMAL, "decimal($p,$s)" );
-		registerColumnType( Types.NUMERIC, "decimal($p,$s)" );
+		registerColumnType( Types.DECIMAL, buildId >= 201 ? "numeric($p,$s)" : "decimal($p,$s)" );
+		registerColumnType( Types.NUMERIC, buildId >= 201 ? "numeric($p,$s)" : "decimal($p,$s)" );
 		registerColumnType( Types.DOUBLE, "double" );
 		registerColumnType( Types.FLOAT, "float" );
 		registerColumnType( Types.INTEGER, "integer" );
@@ -129,7 +136,7 @@ public class H2Dialect extends Dialect {
 		registerColumnType( Types.TIME, "time" );
 		registerColumnType( Types.TIMESTAMP, "timestamp" );
 		registerColumnType( Types.VARCHAR, "varchar($l)" );
-		registerColumnType( Types.VARBINARY, "binary($l)" );
+		registerColumnType( Types.VARBINARY, buildId >= 201 ? "varbinary($l)" : "binary($l)" );
 		registerColumnType( Types.BLOB, "blob" );
 		registerColumnType( Types.CLOB, "clob" );
 
@@ -327,6 +334,9 @@ public class H2Dialect extends Dialect {
 				if ( idx > 0 ) {
 					constraintName = message.substring( idx + "violation: ".length() );
 				}
+				if ( sqle.getSQLState().equals("23506") ) {
+					constraintName  = constraintName.substring( 1, constraintName.indexOf(":") );
+				}
 			}
 			return constraintName;
 		}
@@ -423,12 +433,12 @@ public class H2Dialect extends Dialect {
 		// see http://groups.google.com/group/h2-database/browse_thread/thread/562d8a49e2dabe99?hl=en
 		return true;
 	}
-	
+
 	@Override
 	public boolean supportsTuplesInSubqueries() {
-		return false;
+		return supportsTuplesInSubqueries;
 	}
-	
+
 	// Do not drop constraints explicitly, just do this by cascading instead.
 	@Override
 	public boolean dropConstraints() {
