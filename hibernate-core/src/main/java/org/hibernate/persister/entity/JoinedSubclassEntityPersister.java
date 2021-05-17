@@ -13,7 +13,6 @@ import org.hibernate.QueryException;
 import org.hibernate.boot.model.relational.Database;
 import org.hibernate.cache.spi.access.EntityDataAccess;
 import org.hibernate.cache.spi.access.NaturalIdDataAccess;
-import org.hibernate.engine.OptimisticLockStyle;
 import org.hibernate.engine.jdbc.env.spi.JdbcEnvironment;
 import org.hibernate.engine.spi.ExecuteUpdateResultCheckStyle;
 import org.hibernate.engine.spi.SessionFactoryImplementor;
@@ -63,8 +62,6 @@ public class JoinedSubclassEntityPersister extends AbstractEntityPersister {
 	private static final String IMPLICIT_DISCRIMINATOR_ALIAS = "clazz_";
 	private static final Object NULL_DISCRIMINATOR = new MarkerObject("<null discriminator>");
 	private static final Object NOT_NULL_DISCRIMINATOR = new MarkerObject("<not null discriminator>");
-	private static final String NULL_STRING = "null";
-	private static final String NOT_NULL_STRING = "not null";
 
 	// the class hierarchy structure
 	private final int tableSpan;
@@ -107,7 +104,7 @@ public class JoinedSubclassEntityPersister extends AbstractEntityPersister {
 	// subclass discrimination works by assigning particular
 	// values to certain combinations of null primary key
 	// values in the outer join using an SQL CASE
-	private final Map subclassesByDiscriminatorValue = new HashMap();
+	private final Map<Object, String> subclassesByDiscriminatorValue = new HashMap<>();
 	private final String[] discriminatorValues;
 	private final String[] notNullColumnNames;
 	private final int[] notNullColumnTableNumbers;
@@ -200,7 +197,7 @@ public class JoinedSubclassEntityPersister extends AbstractEntityPersister {
 			discriminatorSQLString = null;
 		}
 
-		if ( optimisticLockStyle() == OptimisticLockStyle.ALL || optimisticLockStyle() == OptimisticLockStyle.DIRTY ) {
+		if ( optimisticLockStyle().isAllOrDirty() ) {
 			throw new MappingException( "optimistic-lock=all|dirty not supported for joined-subclass mappings [" + getEntityName() + "]" );
 		}
 
@@ -802,7 +799,16 @@ public class JoinedSubclassEntityPersister extends AbstractEntityPersister {
 	}
 
 	public String getSubclassForDiscriminatorValue(Object value) {
-		return (String) subclassesByDiscriminatorValue.get( value );
+		if ( value == null ) {
+			return subclassesByDiscriminatorValue.get( NULL_DISCRIMINATOR );
+		}
+		else {
+			String result = subclassesByDiscriminatorValue.get( value );
+			if ( result == null ) {
+				result = subclassesByDiscriminatorValue.get( NOT_NULL_DISCRIMINATOR );
+			}
+			return result;
+		}
 	}
 
 	@Override

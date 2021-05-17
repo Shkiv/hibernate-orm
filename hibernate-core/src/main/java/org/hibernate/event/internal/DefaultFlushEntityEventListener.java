@@ -164,7 +164,8 @@ public class DefaultFlushEntityEventListener implements FlushEntityEventListener
 		event.setPropertyValues( values );
 
 		//TODO: avoid this for non-new instances where mightBeDirty==false
-		boolean substitute = wrapCollections( session, persister, types, values );
+
+		boolean substitute = wrapCollections( session, persister, entity, entry.getId(), types, values );
 
 		if ( isUpdateNecessary( event, mightBeDirty ) ) {
 			substitute = scheduleUpdate( event ) || substitute;
@@ -212,6 +213,8 @@ public class DefaultFlushEntityEventListener implements FlushEntityEventListener
 	private boolean wrapCollections(
 			EventSource session,
 			EntityPersister persister,
+			Object entity,
+			Serializable id,
 			Type[] types,
 			Object[] values
 	) {
@@ -225,7 +228,7 @@ public class DefaultFlushEntityEventListener implements FlushEntityEventListener
 			// don't dirty the container. Also, for versioned data, we
 			// need to wrap before calling searchForDirtyCollections
 
-			WrapVisitor visitor = new WrapVisitor( session );
+			WrapVisitor visitor = new WrapVisitor( entity, id ,session );
 			// substitutes into values by side-effect
 			visitor.processEntityPropertyValues( values, types );
 			return visitor.isSubstitutionRequired();
@@ -525,18 +528,13 @@ public class DefaultFlushEntityEventListener implements FlushEntityEventListener
 
 		if ( dirtyProperties == null ) {
 			if ( entity instanceof SelfDirtinessTracker ) {
-				if ( ( (SelfDirtinessTracker) entity ).$$_hibernate_hasDirtyAttributes() ) {
-					int[] dirty = persister.resolveAttributeIndexes( ( (SelfDirtinessTracker) entity ).$$_hibernate_getDirtyAttributes() );
-
-					// HHH-12051 - filter non-updatable attributes
-					// TODO: add Updatability to EnhancementContext and skip dirty tracking of those attributes
-					int count = 0;
-					for ( int i : dirty ) {
-						if ( persister.getPropertyUpdateability()[i] ) {
-							dirty[count++] = i;
-						}
-					}
-					dirtyProperties = count == 0 ? ArrayHelper.EMPTY_INT_ARRAY : count == dirty.length ? dirty : Arrays.copyOf( dirty, count );
+				if ( ( (SelfDirtinessTracker) entity ).$$_hibernate_hasDirtyAttributes() || persister.hasMutableProperties() ) {
+					dirtyProperties = persister.resolveDirtyAttributeIndexes(
+							values,
+							loadedState,
+							( (SelfDirtinessTracker) entity ).$$_hibernate_getDirtyAttributes(),
+							session
+					);
 				}
 				else {
 					dirtyProperties = ArrayHelper.EMPTY_INT_ARRAY;

@@ -167,8 +167,10 @@ public class LogicalConnectionManagedImpl extends AbstractLogicalConnectionImple
 		super.afterTransaction();
 
 		if ( connectionHandlingMode.getReleaseMode() != ConnectionReleaseMode.ON_CLOSE ) {
-			// NOTE : we check for !ON_CLOSE here (rather than AFTER_TRANSACTION) to also catch AFTER_STATEMENT cases
-			// that were circumvented due to held resources
+			// NOTE : we check for !ON_CLOSE here (rather than AFTER_TRANSACTION) to also catch:
+			// - AFTER_STATEMENT cases that were circumvented due to held resources
+			// - BEFORE_TRANSACTION_COMPLETION cases that were circumvented because a rollback occurred
+			//   (we don't get a beforeTransactionCompletion event on rollback).
 			log.debug( "Initiating JDBC connection release from afterTransaction" );
 			releaseConnection();
 		}
@@ -194,33 +196,34 @@ public class LogicalConnectionManagedImpl extends AbstractLogicalConnectionImple
 	}
 
 	private void releaseConnection() {
-		//Some managed containers might trigger this release concurrently:
-		//this is not how they should do things, still we make a local
-		//copy of the variable to prevent confusing errors due to a race conditions
-		//(to trigger a more clear error, if any).
 		final Connection localVariableConnection = this.physicalConnection;
 		if ( localVariableConnection == null ) {
 			return;
 		}
 
+		// We need to set the connection to null before we release resources,
+		// in order to prevent recursion into this method.
+		// Recursion can happen when we release resources and when batch statements are in progress:
+		// when releasing resources, we'll abort the batch statement,
+		// which will trigger "logicalConnection.afterStatement()",
+		// which in some configurations will release the connection.
+		this.physicalConnection = null;
 		try {
-			if ( ! localVariableConnection.isClosed() ) {
-				sqlExceptionHelper.logAndClearWarnings( localVariableConnection );
+			try {
+				getResourceRegistry().releaseResources();
+				if ( !localVariableConnection.isClosed() ) {
+					sqlExceptionHelper.logAndClearWarnings( localVariableConnection );
+				}
 			}
-			jdbcConnectionAccess.releaseConnection( localVariableConnection );
+			finally {
+				jdbcConnectionAccess.releaseConnection( localVariableConnection );
+			}
 		}
 		catch (SQLException e) {
 			throw sqlExceptionHelper.convert( e, "Unable to release JDBC Connection" );
 		}
 		finally {
 			observer.jdbcConnectionReleaseEnd();
-			boolean concurrentUsageDetected = ( this.physicalConnection == null );
-			this.physicalConnection = null;
-			getResourceRegistry().releaseResources();
-			if ( concurrentUsageDetected ) {
-				throw new HibernateException( "Detected concurrent management of connection resources." +
-						" This might indicate a multi-threaded use of Hibernate in combination with managed resources, which is not supported." );
-			}
 		}
 	}
 

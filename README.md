@@ -8,7 +8,7 @@ It also provides an implementation of the JPA specification, which is the standa
 
 This is the repository of its source code: see [Hibernate.org](http://hibernate.org/orm/) for additional information.
 
-[![Build Status](http://ci.hibernate.org/job/hibernate-orm-master-h2-main/badge/icon)](http://ci.hibernate.org/job/hibernate-orm-master-h2-main/)
+[![Build Status](http://ci.hibernate.org/job/hibernate-orm-main-h2-main/badge/icon)](http://ci.hibernate.org/job/hibernate-orm-main-h2-main/)
 [![Language grade: Java](https://img.shields.io/lgtm/grade/java/g/hibernate/hibernate-orm.svg?logo=lgtm&logoWidth=18)](https://lgtm.com/projects/g/hibernate/hibernate-orm/context:java)
 
 Building from sources
@@ -23,8 +23,8 @@ Gradle.
 
 Contributors should read the [Contributing Guide](CONTRIBUTING.md).
 
-See the guides for setting up [IntelliJ](https://developer.jboss.org/wiki/ContributingToHibernateUsingIntelliJ) or
-[Eclipse](https://developer.jboss.org/wiki/ContributingToHibernateUsingEclipse) as your development environment.
+See the guides for setting up [IntelliJ](http://hibernate.org/community/contribute/intellij-idea/) or
+[Eclipse](https://hibernate.org/community/contribute/eclipse-ide/) as your development environment.
 
 Check out the _Getting Started_ section in CONTRIBUTING.md for getting started working on Hibernate source.
 
@@ -146,3 +146,22 @@ You can do this from the module which you are interested in testing or from the 
 
 Afterward, just pick any test from the IDE and run it as usual. Hibernate will pick the database configuration from the `hibernate.properties`
 file that was set up by the `setDataBase` Gradle task.
+
+Starting test databases locally as docker containers
+-------------------------------------------------------------
+
+You don't have to install all databases locally to be able to test against them in case you have docker available.
+The script `docker_db.sh` allows you to start a pre-configured database which can be used for testing.
+
+All you have to do is run the following command:
+
+    ./docker_db.sh postgresql_9_5
+
+omitting the argument will print a list of possible options.
+
+When the database is properly started, you can run tests with special profiles that are suffixed with `_ci`
+e.g. `pgsql_ci` for PostgreSQL. By using the system property `dbHost` you can configure the IP address of your docker host.
+
+The command for running tests could look like the following:
+
+    gradlew test -Pdb=pgsql_ci "-DdbHost=192.168.99.100"

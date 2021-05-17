@@ -8,6 +8,7 @@ package org.hibernate.test.annotations.xml.ejb3;
 
 import org.hibernate.InvalidMappingException;
 import org.hibernate.boot.MetadataSources;
+import org.hibernate.boot.registry.BootstrapServiceRegistryBuilder;
 import org.hibernate.internal.util.xml.UnsupportedOrmXsdVersionException;
 
 import org.hibernate.testing.TestForIssue;
@@ -16,12 +17,13 @@ import org.junit.Test;
 
 import static org.junit.Assert.fail;
 
-@TestForIssue(jiraKey = "HHH-6271")
+@TestForIssue(jiraKey = {"HHH-6271", "HHH-14529"})
 public class NonExistentOrmVersionTest extends BaseUnitTestCase {
 	@Test
 	public void testNonExistentOrmVersion() {
 		try {
-			new MetadataSources()
+			BootstrapServiceRegistryBuilder builder = new BootstrapServiceRegistryBuilder();
+			new MetadataSources( builder.build() )
 					.addResource( "org/hibernate/test/annotations/xml/ejb3/orm5.xml" )
 					.buildMetadata();
 			fail( "Expecting failure due to unsupported xsd version" );

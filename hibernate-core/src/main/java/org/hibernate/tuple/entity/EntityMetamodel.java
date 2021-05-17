@@ -8,6 +8,7 @@ package org.hibernate.tuple.entity;
 
 import java.io.Serializable;
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -19,6 +20,7 @@ import java.util.Set;
 import org.hibernate.EntityMode;
 import org.hibernate.HibernateException;
 import org.hibernate.MappingException;
+import org.hibernate.boot.spi.MetadataImplementor;
 import org.hibernate.boot.spi.SessionFactoryOptions;
 import org.hibernate.bytecode.enhance.spi.interceptor.EnhancementHelper;
 import org.hibernate.bytecode.spi.BytecodeEnhancementMetadata;
@@ -35,6 +37,7 @@ import org.hibernate.mapping.Component;
 import org.hibernate.mapping.PersistentClass;
 import org.hibernate.mapping.Property;
 import org.hibernate.persister.entity.EntityPersister;
+import org.hibernate.persister.spi.PersisterCreationContext;
 import org.hibernate.tuple.GenerationTiming;
 import org.hibernate.tuple.IdentifierProperty;
 import org.hibernate.tuple.InDatabaseValueGenerationStrategy;
@@ -44,6 +47,7 @@ import org.hibernate.tuple.PropertyFactory;
 import org.hibernate.tuple.ValueGeneration;
 import org.hibernate.tuple.ValueGenerator;
 import org.hibernate.type.AssociationType;
+import org.hibernate.type.ComponentType;
 import org.hibernate.type.CompositeType;
 import org.hibernate.type.EntityType;
 import org.hibernate.type.Type;
@@ -97,7 +101,7 @@ public class EntityMetamodel implements Serializable {
 
 	private final Map<String, Integer> propertyIndexes = new HashMap<>();
 	private final boolean hasCollections;
-	private final boolean hasMutableProperties;
+	private final BitSet mutablePropertiesIndexes;
 	private final boolean hasLazyProperties;
 	private final boolean hasNonIdentifierPropertyNamedId;
 
@@ -129,8 +133,8 @@ public class EntityMetamodel implements Serializable {
 	public EntityMetamodel(
 			PersistentClass persistentClass,
 			EntityPersister persister,
-			SessionFactoryImplementor sessionFactory) {
-		this.sessionFactory = sessionFactory;
+			PersisterCreationContext creationContext) {
+		this.sessionFactory = creationContext.getSessionFactory();
 
 		name = persistentClass.getEntityName();
 		rootName = persistentClass.getRootClass().getEntityName();
@@ -167,8 +171,8 @@ public class EntityMetamodel implements Serializable {
 					persistentClass,
 					idAttributeNames,
 					nonAggregatedCidMapper,
-					sessionFactoryOptions.isEnhancementAsProxyEnabled(),
-					sessionFactoryOptions.isCollectionsInDefaultFetchGroupEnabled()
+					sessionFactoryOptions.isCollectionsInDefaultFetchGroupEnabled(),
+					creationContext
 			);
 		}
 		else {
@@ -208,7 +212,7 @@ public class EntityMetamodel implements Serializable {
 		int tempVersionProperty = NO_VERSION_INDX;
 		boolean foundCascade = false;
 		boolean foundCollection = false;
-		boolean foundMutable = false;
+		BitSet mutableIndexes = new BitSet();
 		boolean foundNonIdentifierPropertyNamedId = false;
 		boolean foundUpdateableNaturalIdProperty = false;
 
@@ -231,7 +235,8 @@ public class EntityMetamodel implements Serializable {
 						sessionFactory,
 						i,
 						prop,
-						bytecodeEnhancementMetadata.isEnhancedForLazyLoading()
+						bytecodeEnhancementMetadata.isEnhancedForLazyLoading(),
+						creationContext
 				);
 			}
 
@@ -250,7 +255,12 @@ public class EntityMetamodel implements Serializable {
 			boolean lazy = ! EnhancementHelper.includeInBaseFetchGroup(
 					prop,
 					bytecodeEnhancementMetadata.isEnhancedForLazyLoading(),
-					sessionFactoryOptions.isEnhancementAsProxyEnabled(),
+					(entityName) -> {
+						final MetadataImplementor metadata = creationContext.getMetadata();
+						final PersistentClass entityBinding = metadata.getEntityBinding( entityName );
+						assert entityBinding != null;
+						return entityBinding.hasSubclasses();
+					},
 					sessionFactoryOptions.isCollectionsInDefaultFetchGroupEnabled()
 			);
 
@@ -318,8 +328,9 @@ public class EntityMetamodel implements Serializable {
 				foundCollection = true;
 			}
 
-			if ( propertyTypes[i].isMutable() && propertyCheckability[i] ) {
-				foundMutable = true;
+			// Component types are dirty tracked as well so they are not exactly mutable for the "maybeDirty" check
+			if ( propertyTypes[i].isMutable() && propertyCheckability[i] && !( propertyTypes[i] instanceof ComponentType ) ) {
+				mutableIndexes.set( i );
 			}
 
 			mapPropertyToIndex(prop, i);
@@ -384,9 +395,7 @@ public class EntityMetamodel implements Serializable {
 		hasSubclasses = persistentClass.hasSubclasses();
 
 		optimisticLockStyle = persistentClass.getOptimisticLockStyle();
-		final boolean isAllOrDirty =
-				optimisticLockStyle == OptimisticLockStyle.ALL
-						|| optimisticLockStyle == OptimisticLockStyle.DIRTY;
+		final boolean isAllOrDirty = optimisticLockStyle.isAllOrDirty();
 		if ( isAllOrDirty && !dynamicUpdate ) {
 			throw new MappingException( "optimistic-lock=all|dirty requires dynamic-update=\"true\": " + name );
 		}
@@ -395,7 +404,7 @@ public class EntityMetamodel implements Serializable {
 		}
 
 		hasCollections = foundCollection;
-		hasMutableProperties = foundMutable;
+		mutablePropertiesIndexes = mutableIndexes;
 
 		iter = persistentClass.getSubclassIterator();
 		final Set<String> subclassEntityNamesLocal = new HashSet<>();
@@ -890,7 +899,11 @@ public class EntityMetamodel implements Serializable {
 	}
 
 	public boolean hasMutableProperties() {
-		return hasMutableProperties;
+		return !mutablePropertiesIndexes.isEmpty();
+	}
+
+	public BitSet getMutablePropertiesIndexes() {
+		return mutablePropertiesIndexes;
 	}
 
 	public boolean hasNonIdentifierPropertyNamedId() {

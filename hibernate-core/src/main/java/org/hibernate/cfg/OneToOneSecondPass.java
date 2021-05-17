@@ -237,17 +237,6 @@ public class OneToOneSecondPass implements SecondPass {
 				boolean referenceToPrimaryKey  = referencesDerivedId || mappedBy == null;
 				value.setReferenceToPrimaryKey( referenceToPrimaryKey );
 
-				// If the other side is a derived ID, and both sides are eager using FetchMode.JOIN,
-				// prevent an infinite loop of attempts to resolve identifiers by making
-				// this side use FetchMode.SELECT.
-				if ( referencesDerivedId &&
-						!value.isLazy() &&
-						value.getFetchMode() == FetchMode.JOIN &&
-						!otherSideProperty.isLazy() &&
-						otherSideProperty.getValue().getFetchMode() == FetchMode.JOIN ) {
-					value.setFetchMode( FetchMode.SELECT );
-				}
-
 				String propertyRef = value.getReferencedPropertyName();
 				if ( propertyRef != null ) {
 					buildingContext.getMetadataCollector().addUniquePropertyReference(

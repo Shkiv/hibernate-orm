@@ -1669,7 +1669,7 @@ public interface CoreMessageLogger extends BasicLogger {
 	)
 	void applyingExplicitDiscriminatorColumnForJoined(String className, String overrideSetting);
 
-	// 458-466 reserved for use by master (ORM 5.0.0)
+	// 458-466 reserved for use by main branch (ORM 5.0.0)
 
 	@LogMessage(level = DEBUG)
 	@Message(value = "Creating pooled optimizer (lo) with [incrementSize=%s; returnClass=%s]", id = 467)
@@ -1855,5 +1855,14 @@ public interface CoreMessageLogger extends BasicLogger {
 	@LogMessage(level = WARN)
 	@Message(value = "Ignoring ServiceConfigurationError caught while trying to instantiate service '%s'.", id = 505)
 	void ignoringServiceConfigurationError(Class<?> serviceContract, @Cause ServiceConfigurationError error);
+
+	@LogMessage(level = WARN)
+	@Message(value = "Detaching an uninitialized collection with enabled filters from a session: %s", id = 506)
+	void enabledFiltersWhenDetachFromSession(String collectionInfoString);
+
+	@LogMessage(level = WARN)
+	@Message(value = "The Javassist based BytecodeProvider is deprecated. Please switch to using the ByteBuddy based BytecodeProvider, " +
+			"which is the default since Hibernate ORM 5.3. The Javassist one will be removed soon.", id = 507)
+	void warnUsingJavassistBytecodeProviderIsDeprecated();
 
 }

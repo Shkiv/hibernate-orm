@@ -84,6 +84,7 @@ import org.hibernate.id.enhanced.SequenceStyleGenerator;
 import org.hibernate.internal.CoreLogging;
 import org.hibernate.internal.CoreMessageLogger;
 import org.hibernate.internal.util.ReflectHelper;
+import org.hibernate.internal.util.StringHelper;
 import org.hibernate.internal.util.collections.ArrayHelper;
 import org.hibernate.internal.util.io.StreamCopier;
 import org.hibernate.loader.BatchLoadSizingStrategy;
@@ -151,6 +152,10 @@ public abstract class Dialect implements ConversionContext {
 			"'",
 			Pattern.LITERAL
 	);
+
+	private static final Pattern ESCAPE_CLOSING_COMMENT_PATTERN = Pattern.compile( "\\*/" );
+	private static final Pattern ESCAPE_OPENING_COMMENT_PATTERN = Pattern.compile( "/\\*" );
+
 	public static final String TWO_SINGLE_QUOTES_REPLACEMENT = Matcher.quoteReplacement( "''" );
 
 	private final TypeNames typeNames = new TypeNames();
@@ -205,6 +210,7 @@ public abstract class Dialect implements ConversionContext {
 		registerColumnType( Types.FLOAT, "float($p)" );
 		registerColumnType( Types.DOUBLE, "double precision" );
 		registerColumnType( Types.NUMERIC, "numeric($p,$s)" );
+		registerColumnType( Types.DECIMAL, "decimal($p,$s)" );
 		registerColumnType( Types.REAL, "real" );
 
 		registerColumnType( Types.DATE, "date" );
@@ -2446,6 +2452,19 @@ public abstract class Dialect implements ConversionContext {
 	}
 
 	/**
+	 * Is this dialect known to support  what ANSI-SQL terms "row value constructor" syntax, 
+	 * sometimes called tuple syntax, in the SET clause;
+	 * <p/>
+	 * Basically, does it support syntax like
+	 * "... SET (FIRST_NAME, LAST_NAME) = ('Steve', 'Ebersole') ...".
+	 *
+	 * @return True if this SQL dialect is known to support "row value constructor" syntax in the SET clause; false otherwise.
+	 */
+	public boolean supportsRowValueConstructorSyntaxInSet() {
+		return supportsRowValueConstructorSyntax();
+	}
+
+	/**
 	 * If the dialect supports {@link #supportsRowValueConstructorSyntax() row values},
 	 * does it offer such support in IN lists as well?
 	 * <p/>
@@ -3075,7 +3094,15 @@ public abstract class Dialect implements ConversionContext {
 	}
 
 	protected String prependComment(String sql, String comment) {
-		return  "/* " + comment + " */ " + sql;
+		return "/* " + escapeComment( comment ) + " */ " + sql;
+	}
+
+	public static String escapeComment(String comment) {
+		if ( StringHelper.isNotEmpty( comment ) ) {
+			final String escaped = ESCAPE_CLOSING_COMMENT_PATTERN.matcher( comment ).replaceAll( "*\\\\/" );
+			return ESCAPE_OPENING_COMMENT_PATTERN.matcher( escaped ).replaceAll( "/\\\\*" );
+		}
+		return comment;
 	}
 
 	public boolean supportsSelectAliasInGroupByClause() {
